@@ -1,0 +1,39 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.pytest_cache/
+
+# Virtual environments
+.venv
+.env
+
+# Dataset Arrow snapshots (large, cluster-local)
+data/
+
+# Local HF cache if accidentally placed here
+.cache/
+
+# Editor/IDE files
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Evaluation results (commit only selected results)
+results/*.json
+*.job
+
+# Logs and temporary files
+*.log
+*.out
+slurm-*.out
+output.log

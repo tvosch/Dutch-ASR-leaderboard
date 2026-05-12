@@ -1,0 +1,51 @@
+{
+  "_comment": "Model metadata. Add type field for model categorization (e.g., 'multilingual', 'dutch-specific', 'custom').",
+  "openai/whisper-large-v3": {
+    "model_name": "Whisper Large v3",
+    "params_millions": 1550,
+    "license": "MIT",
+    "type": "multilingual"
+  },
+  "openai/whisper-large-v3-turbo": {
+    "model_name": "Whisper Large v3 Turbo",
+    "params_millions": 809,
+    "license": "MIT",
+    "type": "multilingual"
+  },
+  "openai/whisper-medium": {
+    "model_name": "Whisper Medium",
+    "params_millions": 307,
+    "license": "MIT",
+    "type": "multilingual"
+  },
+  "openai/whisper-small": {
+    "model_name": "Whisper Small",
+    "params_millions": 244,
+    "license": "MIT",
+    "type": "multilingual"
+  },
+  "facebook/mms-300m": {
+    "model_name": "MMS 300M",
+    "params_millions": 300,
+    "license": "CC-BY-NC-4.0",
+    "type": "multilingual"
+  },
+  "facebook/seamless-m4t-v2-large": {
+    "model_name": "SeamlessM4T v2 Large",
+    "params_millions": 2300,
+    "license": "CC-BY-NC-4.0",
+    "type": "multilingual"
+  },
+  "CohereLabs/cohere-transcribe-03-2026": {
+    "model_name": "Cohere Transcribe (Mar 2026)",
+    "params_millions": null,
+    "license": "cc-by-nc-4.0",
+    "type": "multilingual"
+  },
+  "GroNLP/wav2vec2-dutch-large-ft-cgn": {
+    "model_name": "Wav2Vec2 Dutch Large (CGN)",
+    "params_millions": 317,
+    "license": "apache-2.0",
+    "type": "dutch-specific"
+  }
+}
