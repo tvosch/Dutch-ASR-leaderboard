@@ -30,6 +30,15 @@ DATASETS: dict[str, dict[str, Any]] = {
         "key": "common_voice_18_nl",
         "trust_remote_code": True,
     },
+    "common_voice_25": {
+        "hf_id": "mozilla-foundation/common_voice_25_0",
+        "config": "nl",
+        "split": "test",
+        "audio_col": "audio",
+        "text_col": "sentence",
+        "key": "common_voice_25_nl",
+        "trust_remote_code": True,
+    },
     "voxpopuli": {
         "hf_id": "facebook/voxpopuli",
         "config": "nl",
