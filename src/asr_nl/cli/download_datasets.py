@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 def download_dataset(name: str, cfg: dict, save_to_disk: bool, data_dir: Path):
     print(f"\n{'='*60}")
     print(f"Dataset: {name} ({cfg['hf_id']}, config={cfg['config']})")
-    print(f"License: {cfg['license']}")
-    print(f"Notes: {cfg['notes']}")
+    print(f"License: {cfg.get('license', 'see dataset card')}")
+    print(f"Notes: {cfg.get('notes', '—')}")
     print(f"{'='*60}")
-    
-    for split in cfg["splits"]:
+
+    for split in cfg.get("splits", [cfg["split"]]):
         disk_path = data_dir / cfg["key"] / split
         if save_to_disk and disk_path.exists():
             logger.info(f"[{split}] Arrow snapshot already at {disk_path} — skipping.")
@@ -61,7 +61,7 @@ def download_dataset(name: str, cfg: dict, save_to_disk: bool, data_dir: Path):
 
 def verify_dataset(name: str, cfg: dict, data_dir: Path):
     logger.info(f"[verify] {name}")
-    for split in cfg["splits"]:
+    for split in cfg.get("splits", [cfg["split"]]):
         disk_path = data_dir / cfg["key"] / split
         if disk_path.exists():
             try:
