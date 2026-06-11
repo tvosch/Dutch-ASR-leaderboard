@@ -13,6 +13,7 @@ Community leaderboard for Dutch Automatic Speech Recognition models.
 | **FLEURS** | Read speech | Parallel sentences translated from Wikipedia. Studio-quality. |
 | **VoxPopuli** | Spontaneous | European Parliament speech. Formal, domain-adaptation test. |
 | **Multilingual LibriSpeech** | Read speech | Audiobook style. |
+| **Common Voice 25** | Read speech | Crowd-sourced volunteer recordings. Wide speaker/accent/device variety. Gated on HF Hub (click-through); also available ungated via the Mozilla Data Collective. |
 
 ---
 
@@ -35,7 +36,7 @@ Results are written to `results/<model>.json`. Add them to the leaderboard via P
 ## Roadmap
 
 - [ ] **Dutch text normalization**: Dutch-specific handling (https://github.com/ThomasKluiters/european-normalizer)
-- [ ] **Common Voice dataset** — Or any other CV version
+- [x] **Common Voice dataset** — CV 25 NL config available as `common_voice_25` (leaderboard Space column pending). Note: most Dutch-specific models fine-tune on CV train; same-version splits are speaker-disjoint, but flag this like the existing benchmaxxing note.
 - [ ] **Tier-2 datasets** — Add CLARIN-NL datasets (N-Best 2008, CGN) with institutional access (https://opensource-spraakherkenning-nl.github.io/ASR_NL_results/)
 
 ---
