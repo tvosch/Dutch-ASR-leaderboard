@@ -1,123 +1,130 @@
 """Evaluation loop and metrics."""
 
-import json
 import logging
-from pathlib import Path
-from typing import Optional
-
 import time
+from pathlib import Path
+from typing import Collection, Optional
 
+import jiwer
+
+from asr_nl.audio import to_mono
+from asr_nl.backends import BaseBackend
 from asr_nl.datasets import DATASETS, load_eval_dataset
 from asr_nl.text import normalize_text
 
-from asr_nl.backends import BaseBackend
-
 logger = logging.getLogger(__name__)
+
+
+def result_normalizer_version(record: dict) -> int | None:
+    """Normalizer version of a result file; files predating the field used v1."""
+    if not record.get("normalize", True):
+        return None
+    return record.get("normalizer_version", 1)
+
+
+def score_samples(
+    per_sample: list[dict], language: str, normalize: bool = True, exclude: Collection[int] = ()
+) -> dict:
+    """
+    (Re)compute scored text and corpus-level metrics from per-sample records.
+
+    Mutates each successful record in place, setting reference_scored and
+    hypothesis_scored. Failed samples (those with an "error") and samples with
+    an empty scored reference are excluded from WER/CER, as are samples whose
+    index is in `exclude` (known-bad dataset clips).
+    """
+    references, hypotheses, rtfs = [], [], []
+    for s in per_sample:
+        if "error" in s or s.get("index") in exclude:
+            continue
+        s["reference_scored"] = normalize_text(s["reference"], language) if normalize else s["reference"]
+        s["hypothesis_scored"] = normalize_text(s["hypothesis"], language) if normalize else s["hypothesis"]
+        if s["reference_scored"]:
+            references.append(s["reference_scored"])
+            hypotheses.append(s["hypothesis_scored"])
+            rtfs.append(s["rtf"])
+
+    if not references:
+        return {}
+
+    n_total = len(per_sample)
+    n_failed = sum("error" in s for s in per_sample)
+    return {
+        "wer": round(jiwer.wer(references, hypotheses) * 100, 2),
+        "cer": round(jiwer.cer(references, hypotheses) * 100, 2),
+        "rtf": round(sum(rtfs) / len(rtfs), 4),
+        "n_samples": len(references),
+        "excluded": sorted(i for i in exclude if any(s.get("index") == i for s in per_sample)),
+        "n_total": n_total,
+        "n_failed": n_failed,
+        "failure_rate_pct": round(n_failed / n_total * 100, 1),
+    }
 
 
 def evaluate_dataset(
     dataset_name: str,
     backend: BaseBackend,
-    language: str = "nl",
+    language: Optional[str] = None,
     max_samples: Optional[int] = None,
     data_dir: Optional[Path] = None,
     normalize: bool = True,
 ) -> dict:
     """
-    Evaluate a model on a dataset and return metrics.
-    
-    Returns dict with wer, cer, rtf, n_samples, n_failed, failure_rate_pct, per_sample.
+    Transcribe a dataset with `backend` and return metrics plus per-sample records.
+
+    `language` defaults to the dataset's own language from DATASETS.
     """
-    from evaluate import load as load_metric
-    
-    wer_metric = load_metric("wer")
-    cer_metric = load_metric("cer")
     cfg = DATASETS[dataset_name]
-    
-    logger.info(f"[{dataset_name}] {cfg['hf_id']} / {cfg['config']} (normalize={'on' if normalize else 'OFF'})")
-    
+    language = language or cfg["language"]
+    logger.info(f"[{dataset_name}] {cfg['hf_id']} / {cfg['config']} language={language} normalize={normalize}")
+
     ds = load_eval_dataset(dataset_name, data_dir)
     if max_samples:
         ds = ds.select(range(min(max_samples, len(ds))))
-    
-    references, hypotheses, rtf_values = [], [], []
+
     per_sample = []
-    n_failed = 0
-    
     for i, sample in enumerate(ds):
-        reference = sample[cfg["text_col"]] or ""
-        audio_dur = len(sample[cfg["audio_col"]]["array"]) / sample[cfg["audio_col"]]["sampling_rate"]
-        
-        logger.info(f"[{dataset_name}] Sample {i+1}/{len(ds)} (audio: {audio_dur:.1f}s)")
-        
-        req_t0 = time.perf_counter()
-        try:
-            hyp, rtf = backend.transcribe(sample[cfg["audio_col"]], language)
-        except Exception as e:
-            elapsed = time.perf_counter() - req_t0
-            n_failed += 1
-            logger.warning(f"[{dataset_name}] Sample {i} failed after {elapsed:.1f}s: {e}")
-            per_sample.append({
-                "index": i,
-                "audio_duration": round(audio_dur, 2),
-                "reference": reference,
-                "hypothesis": "",
-                "error": str(e),
-            })
-            continue
-        
-        elapsed = time.perf_counter() - req_t0
-        if i < 5 or elapsed > 10:
-            hyp_short = (hyp or '')[:80]
-            logger.info(f"[{dataset_name}] Sample {i+1} done in {elapsed:.1f}s (RTF={rtf:.3f}): {hyp_short}")
-        
-        ref_scored = normalize_text(reference, language) if normalize else reference
-        hyp_scored = normalize_text(hyp, language) if normalize else hyp
-        
-        if i < 3 and ref_scored:
-            logger.info(f"[{dataset_name}] REF: {ref_scored}")
-            logger.info(f"[{dataset_name}] HYP: {hyp_scored}")
-        
-        per_sample.append({
+        # Every model expects mono; down-mix here so all backends get the same signal.
+        audio = {"array": to_mono(sample[cfg["audio_col"]]["array"]),
+                 "sampling_rate": sample[cfg["audio_col"]]["sampling_rate"]}
+        record = {
             "index": i,
-            "audio_duration": round(audio_dur, 2),
-            "reference": reference,
-            "reference_scored": ref_scored,
-            "hypothesis": hyp,
-            "hypothesis_scored": hyp_scored,
-            "rtf": round(rtf, 4),
-            "elapsed": round(elapsed, 2),
-        })
-        
-        if ref_scored:
-            references.append(ref_scored)
-            hypotheses.append(hyp_scored)
-            rtf_values.append(rtf)
-        
+            "audio_duration": round(len(audio["array"]) / audio["sampling_rate"], 2),
+            "reference": sample[cfg["text_col"]] or "",
+        }
+        t0 = time.perf_counter()
+        try:
+            hyp, rtf = backend.transcribe(audio, language)
+        except Exception as e:
+            logger.warning(f"[{dataset_name}] Sample {i} failed after {time.perf_counter() - t0:.1f}s: {e}")
+            record.update(hypothesis="", error=str(e))
+        else:
+            record.update(hypothesis=hyp or "", rtf=round(rtf, 4), elapsed=round(time.perf_counter() - t0, 2))
+            if i < 3:
+                logger.info(f"[{dataset_name}] REF: {record['reference']}")
+                logger.info(f"[{dataset_name}] HYP: {record['hypothesis']}")
+        per_sample.append(record)
+
         if (i + 1) % 50 == 0:
             logger.info(f"[{dataset_name}] {i + 1}/{len(ds)} processed")
-    
-    if not references:
+
+    metrics = score_samples(per_sample, language, normalize, exclude=cfg.get("exclude", {}))
+    if not metrics:
         logger.warning(f"[{dataset_name}] No valid references - skipping")
         return {}
-    
-    wer = round(wer_metric.compute(predictions=hypotheses, references=references) * 100, 2)
-    cer = round(cer_metric.compute(predictions=hypotheses, references=references) * 100, 2)
-    rtf_mean = round(sum(rtf_values) / len(rtf_values), 4)
-    n_total = len(ds)
-    failure_rate = round(n_failed / n_total * 100, 1) if n_total > 0 else 0.0
-    
-    if n_failed > 0:
-        logger.warning(f"[{dataset_name}] {n_failed}/{n_total} samples failed ({failure_rate}%)")
-    
-    logger.info(f"[{dataset_name}] WER={wer}% CER={cer}% RTF={rtf_mean} failures={failure_rate}%")
-    
+    if metrics["n_failed"]:
+        logger.warning(f"[{dataset_name}] {metrics['n_failed']}/{metrics['n_total']} samples failed")
+    logger.info(f"[{dataset_name}] WER={metrics['wer']}% CER={metrics['cer']}% RTF={metrics['rtf']}")
+
     return {
-        "wer": wer,
-        "cer": cer,
-        "rtf": rtf_mean,
-        "n_samples": len(references),
-        "n_failed": n_failed,
-        "failure_rate_pct": failure_rate,
+        **metrics,
+        "dataset": {
+            "hf_id": cfg["hf_id"],
+            "config": cfg["config"],
+            "split": cfg["split"],
+            "revision": cfg.get("revision"),
+            "language": language,
+            "fingerprint": getattr(ds, "_fingerprint", None),
+        },
         "per_sample": per_sample,
     }

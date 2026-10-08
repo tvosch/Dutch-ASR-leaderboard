@@ -1,5 +1,5 @@
-"""Main entry point for asr-leaderboard package."""
+"""Allow `python -m asr_nl` as an alias for `python -m asr_nl.eval`."""
 
-from . import __version__
+from asr_nl.eval import main
 
-__all__ = ["__version__"]
+main()
