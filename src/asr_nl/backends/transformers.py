@@ -3,10 +3,12 @@
 import logging
 import time
 
+from .base import BaseBackend
+
 logger = logging.getLogger(__name__)
 
 
-class TransformersBackend:
+class TransformersBackend(BaseBackend):
     """HuggingFace transformers pipeline backend."""
     
     def __init__(self, model_id: str, device: str = "cpu"):
@@ -44,3 +46,7 @@ class TransformersBackend:
         
         rtf = (time.perf_counter() - t0) / duration if duration > 0 else 0.0
         return out["text"], rtf
+
+    def run_info(self) -> dict:
+        import transformers
+        return {"transformers_version": transformers.__version__}

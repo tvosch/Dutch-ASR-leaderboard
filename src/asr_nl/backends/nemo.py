@@ -5,10 +5,14 @@ import tempfile
 import time
 from pathlib import Path
 
+from asr_nl.audio import TARGET_SR, audio_to_wav_bytes, resample_to_16k
+
+from .base import BaseBackend
+
 logger = logging.getLogger(__name__)
 
 
-class NeMoBackend:
+class NeMoBackend(BaseBackend):
     """NeMo ASR backend using nemo.collections.asr."""
 
     def __init__(self, model_id: str, device: str = "cuda"):
@@ -26,9 +30,6 @@ class NeMoBackend:
         logger.info("NeMo model loaded.")
 
     def transcribe(self, audio: dict, language: str = "nl") -> tuple[str, float]:
-        from asr_nl.audio import audio_to_wav_bytes, resample_to_16k
-        from asr_nl.audio.processing import TARGET_SR
-
         array = audio["array"]
         sr = audio["sampling_rate"]
         duration = len(array) / sr
@@ -41,19 +42,18 @@ class NeMoBackend:
             tmp_path = Path(f.name)
 
         try:
+            # Suppress NeMo's per-sample Lhotse/dataloader warnings
+            noisy = [logging.getLogger(n) for n in ("nemo", "nemo_logger", "lhotse")]
+            prev_levels = [lg.level for lg in noisy]
+            for lg in noisy:
+                lg.setLevel(logging.ERROR)
             t0 = time.perf_counter()
-            # Suppress NeMo's per-sample Lhotse/dataloader warnings and tqdm bar
-            import logging as _logging
-            _nemo_loggers = [
-                _logging.getLogger(n) for n in ("nemo", "nemo_logger", "lhotse")
-            ]
-            _prev_levels = [lg.level for lg in _nemo_loggers]
-            for lg in _nemo_loggers:
-                lg.setLevel(_logging.ERROR)
-            results = self.model.transcribe([str(tmp_path)], batch_size=1, verbose=False)
-            for lg, lvl in zip(_nemo_loggers, _prev_levels):
-                lg.setLevel(lvl)
-            elapsed = time.perf_counter() - t0
+            try:
+                results = self.model.transcribe([str(tmp_path)], batch_size=1, verbose=False)
+            finally:
+                elapsed = time.perf_counter() - t0
+                for lg, lvl in zip(noisy, prev_levels):
+                    lg.setLevel(lvl)
         finally:
             tmp_path.unlink(missing_ok=True)
 
@@ -65,5 +65,6 @@ class NeMoBackend:
         rtf = elapsed / duration if duration > 0 else 0.0
         return text, rtf
 
-    def close(self):
-        pass
+    def run_info(self) -> dict:
+        import nemo
+        return {"nemo_version": nemo.__version__}
