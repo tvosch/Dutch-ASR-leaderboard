@@ -9,6 +9,7 @@ from pathlib import Path
 from datasets import load_dataset, load_from_disk
 
 from asr_nl.datasets import DATASETS
+from asr_nl.datasets.loader import REVISION_FILE
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -17,11 +18,9 @@ logger = logging.getLogger(__name__)
 def download_dataset(name: str, cfg: dict, save_to_disk: bool, data_dir: Path):
     print(f"\n{'='*60}")
     print(f"Dataset: {name} ({cfg['hf_id']}, config={cfg['config']})")
-    print(f"License: {cfg['license']}")
-    print(f"Notes: {cfg['notes']}")
     print(f"{'='*60}")
     
-    for split in cfg["splits"]:
+    for split in [cfg["split"]]:
         disk_path = data_dir / cfg["key"] / split
         if save_to_disk and disk_path.exists():
             logger.info(f"[{split}] Arrow snapshot already at {disk_path} — skipping.")
@@ -33,6 +32,7 @@ def download_dataset(name: str, cfg: dict, save_to_disk: bool, data_dir: Path):
                 cfg["hf_id"],
                 cfg["config"],
                 split=split,
+                revision=cfg.get("revision"),
                 trust_remote_code=cfg.get("trust_remote_code", False),
             )
         except Exception as e:
@@ -54,6 +54,8 @@ def download_dataset(name: str, cfg: dict, save_to_disk: bool, data_dir: Path):
             disk_path.parent.mkdir(parents=True, exist_ok=True)
             logger.info(f"[{split}] Saving Arrow snapshot to {disk_path}...")
             ds.save_to_disk(str(disk_path))
+            if cfg.get("revision"):
+                (disk_path / REVISION_FILE).write_text(cfg["revision"] + "\n")
             logger.info(f"[{split}] Saved ({n} rows).")
         else:
             logger.info(f"[{split}] Done ({n} rows). Data in HF cache ($HF_HOME/datasets/).")
@@ -61,7 +63,7 @@ def download_dataset(name: str, cfg: dict, save_to_disk: bool, data_dir: Path):
 
 def verify_dataset(name: str, cfg: dict, data_dir: Path):
     logger.info(f"[verify] {name}")
-    for split in cfg["splits"]:
+    for split in [cfg["split"]]:
         disk_path = data_dir / cfg["key"] / split
         if disk_path.exists():
             try:
@@ -75,6 +77,7 @@ def verify_dataset(name: str, cfg: dict, data_dir: Path):
                     cfg["hf_id"],
                     cfg["config"],
                     split=split,
+                    revision=cfg.get("revision"),
                     trust_remote_code=cfg.get("trust_remote_code", False),
                 )
                 logger.info(f"[{split}] HF cache OK — {len(ds)} rows")
@@ -125,7 +128,7 @@ def main():
     if not args.verify_only and not args.save_to_disk:
         logger.info(
             "Tip: pass --save-to-disk to save Arrow snapshots for faster eval loading.\n"
-            "Then set --data-dir in asr-nl-eval (or it auto-detects data/ if present)."
+            "Then pass the same --data-dir to asr-nl-eval."
         )
 
 
