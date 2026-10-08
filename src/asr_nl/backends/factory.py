@@ -9,13 +9,6 @@ from .transformers import TransformersBackend
 
 logger = logging.getLogger(__name__)
 
-VLLM_AUDIO_ARCHITECTURES = {
-    "Qwen2AudioForConditionalGeneration",
-    "UltravoxModel",
-    "WhisperForConditionalGeneration",
-}
-
-
 def create_backend(args) -> BaseBackend:
     """Create the backend specified by args.backend."""
     backend = args.backend

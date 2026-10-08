@@ -1,4 +1,9 @@
-"""Text normalization utilities."""
+"""Text normalization utilities.
+
+Bump NORMALIZER_VERSION whenever the output of normalize_text() changes, so
+results scored with different normalizers are never mixed. Version 1 is the
+normalizer the current leaderboard is scored with.
+"""
 
 import logging
 import re
@@ -7,6 +12,8 @@ import unicodedata
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+NORMALIZER_VERSION = 1
 
 FILLER_WORDS = {"uh", "um", "eh", "euh", "hmm", "hm", "ah", "uhm"}
 

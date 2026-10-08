@@ -26,6 +26,22 @@ def audio_to_wav_bytes(array: np.ndarray, sample_rate: int) -> bytes:
         return buf.getvalue()
 
 
+def to_mono(array: np.ndarray) -> np.ndarray:
+    """Down-mix to one channel by averaging channels, as the models expect.
+
+    Accepts mono (samples,) or multi-channel audio in either layout:
+    (channels, samples) from `datasets` >= 4 or (samples, channels) from
+    soundfile. The channel axis is taken to be the shorter one.
+    """
+    array = np.asarray(array, dtype=np.float32)
+    if array.ndim == 1:
+        return array
+    if array.ndim != 2:
+        raise ValueError(f"Expected 1-D or 2-D audio, got shape {array.shape}")
+    channel_axis = 0 if array.shape[0] <= array.shape[1] else 1
+    return array.mean(axis=channel_axis)
+
+
 def resample_to_16k(array: np.ndarray, sr: int) -> np.ndarray:
     """Resample audio to 16 kHz so all API backends receive a consistent sample rate."""
     if sr == TARGET_SR:

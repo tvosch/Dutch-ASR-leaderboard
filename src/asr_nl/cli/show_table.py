@@ -1,48 +1,43 @@
-"""Print a leaderboard table for Dutch ASR results to stdout."""
+"""Print a leaderboard table of result files to stdout."""
 
 import argparse
+import json
 from pathlib import Path
 
-from ..gradio.app import build_dataframe, load_results, DATASET_KEYS, DATASET_LABELS
+import pandas as pd
+
+DATASET_LABELS = {"fleurs_nl": "FLEURS", "voxpopuli_nl": "VoxPopuli", "mls_nl": "MLS"}
 
 
-def print_table(results_dir: str = "results", sort_by: str = "fleurs_nl", leaderboard: bool = False):
-    records = load_results()
-    if not records:
-        print(f"No result files found in {results_dir}/")
-        return
+def load_results(results_dir: Path) -> list[dict]:
+    return [json.loads(p.read_text()) for p in sorted(results_dir.glob("*.json"))]
 
-    df = build_dataframe(records, primary_dataset=sort_by)
 
-    if leaderboard:
-        keep = ["Model"] + [c for c in df.columns if c in ("FLEURS WER", "VoxPopuli WER")]
-        df = df[keep]
-    else:
-        dutch_labels = {DATASET_LABELS[k] for k in DATASET_KEYS}
-        keep = [c for c in df.columns if any(c.startswith(label) for label in dutch_labels)
-                or c in ("Model", "Type", "Params (M)", "License", "Submitted")]
-        df = df[keep]
-
-    print(df.to_string(index=False))
-    print(f"\n{len(records)} model(s) loaded from results/")
+def build_dataframe(records: list[dict], metric: str = "wer") -> pd.DataFrame:
+    rows = []
+    for r in records:
+        row = {"Model": r.get("model_name", r.get("model_id", "?")), "Norm": r.get("normalizer_version", 1)}
+        for key, label in DATASET_LABELS.items():
+            row[label] = r.get("results", {}).get(key, {}).get(metric)
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    labels = list(DATASET_LABELS.values())
+    # Average only over models that have every dataset, so averages are comparable.
+    df["Average"] = df[labels].mean(axis=1, skipna=False).round(2)
+    return df.sort_values(["Average", "Model"], na_position="last").reset_index(drop=True)
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument(
-        "--sort-by",
-        choices=list(DATASET_KEYS),
-        default="fleurs_nl",
-        help="Dataset to sort by WER (default: fleurs_nl)",
-    )
-    p.add_argument("--results-dir", default="results")
-    p.add_argument(
-        "--leaderboard",
-        action="store_true",
-        help="Print only model name with FLEURS and VoxPopuli WER",
-    )
+    p.add_argument("--results-dir", type=Path, default=Path("results"))
+    p.add_argument("--metric", choices=["wer", "cer", "rtf"], default="wer")
     args = p.parse_args()
-    print_table(args.results_dir, args.sort_by, args.leaderboard)
+
+    records = load_results(args.results_dir)
+    if not records:
+        print(f"No result files found in {args.results_dir}/")
+        return
+    print(build_dataframe(records, args.metric).to_string(index=False, na_rep="—"))
 
 
 if __name__ == "__main__":

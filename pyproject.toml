@@ -49,11 +49,11 @@ dev = [
 asr-nl-eval = "asr_nl.eval:main"
 asr-nl-show = "asr_nl.cli.show_table:main"
 asr-nl-download = "asr_nl.cli.download_datasets:main"
-asr-nl-app = "asr_nl.gradio.app:launch"
+asr-nl-rescore = "asr_nl.cli.rescore:main"
 
 [project.urls]
 Homepage = "https://huggingface.co/spaces/tvosch/Dutch-ASR-Leaderboard"
-Repository = "https://github.com/tvosch/Dutch-ASR-eaderboard"
+Repository = "https://github.com/tvosch/Dutch-ASR-leaderboard"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/asr_nl"]

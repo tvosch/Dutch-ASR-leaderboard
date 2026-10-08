@@ -4,15 +4,17 @@
 import argparse
 import json
 import logging
+import os
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
 
 import asr_nl
-
 from asr_nl.backends import create_backend
 from asr_nl.datasets import DATASETS
-from asr_nl.evaluation import evaluate_dataset
+from asr_nl.evaluation import evaluate_dataset, result_normalizer_version
+from asr_nl.text import NORMALIZER_VERSION
 
 # Configure logging
 logging.basicConfig(
@@ -30,7 +32,7 @@ def parse_args():
         epilog=__doc__,
     )
     p.add_argument("--model", required=True, help="HuggingFace model ID or API model name.")
-    
+
     g = p.add_argument_group("Backend")
     g.add_argument(
         "--backend",
@@ -51,7 +53,12 @@ def parse_args():
     g.add_argument(
         "--api-key",
         default=None,
-        help="API key (or set OPENAI_API_KEY or RESEON8_API_KEY env var). Not stored in results.",
+        help="API key. Prefer --api-key-env so keys stay out of job files and shell history.",
+    )
+    g.add_argument(
+        "--api-key-env",
+        default="OPENAI_API_KEY",
+        help="Environment variable to read the API key from when --api-key is not given (default: OPENAI_API_KEY).",
     )
     g.add_argument(
         "--api-mode",
@@ -65,7 +72,7 @@ def parse_args():
             "elevenlabs: Use ElevenLabs Scribe API (requires elevenlabs package)."
         ),
     )
-    
+
     v = p.add_argument_group("vLLM options")
     v.add_argument("--vllm-port", type=int, default=8080)
     v.add_argument("--tensor-parallel-size", type=int, default=1)
@@ -78,10 +85,10 @@ def parse_args():
             "Example: --vllm-args \"--compilation_config '{\\\"cudagraph_mode\\\": \\\"PIECEWISE\\\"}'\""
         ),
     )
-    
+
     c = p.add_argument_group("Compute")
-    c.add_argument("--device", default="cuda" if __import__("torch").cuda.is_available() else "cpu")
-    
+    c.add_argument("--device", default=None, help="cuda or cpu (default: cuda if available).")
+
     e = p.add_argument_group("Evaluation")
     e.add_argument(
         "--datasets",
@@ -89,7 +96,7 @@ def parse_args():
         choices=list(DATASETS.keys()),
         default=list(DATASETS.keys()),
     )
-    e.add_argument("--language", default="nl")
+    e.add_argument("--language", default=None, help="Override the per-dataset language (debug).")
     e.add_argument("--max-samples", type=int, default=None, help="Cap per dataset (debug).")
     e.add_argument(
         "--data-dir",
@@ -102,29 +109,55 @@ def parse_args():
         default=True,
         help="Apply text normalization before scoring (default: on).",
     )
-    
+
     m = p.add_argument_group("Metadata")
     m.add_argument("--model-name", default=None)
     m.add_argument("--license", default="unknown")
     m.add_argument("--params-billions", type=float, default=None, help="Model size in billions (e.g., 1.7 for 1.7B).")
     m.add_argument("--output-dir", default="results")
-    
-    return p.parse_args()
+
+    args = p.parse_args()
+    if args.api_key is None:
+        args.api_key = os.environ.get(args.api_key_env)
+    if args.device is None:
+        import torch
+        args.device = "cuda" if torch.cuda.is_available() else "cpu"
+    return args
+
+
+def _git_commit() -> str | None:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).parent, capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except Exception:
+        return None
 
 
 def main():
     args = parse_args()
-    
+
     logger.info(f"Model: {args.model}")
     logger.info(f"Backend: {args.backend}")
     logger.info(f"Device: {args.device}")
     logger.info(f"Datasets: {args.datasets}")
     logger.info(f"Normalize: {args.normalize}")
-    
+
+    output_dir = Path(args.output_dir)
+    out_path = output_dir / f"{args.model.replace('/', '__')}.json"
+    existing = json.loads(out_path.read_text()) if out_path.exists() else None
+    if existing and result_normalizer_version(existing) != (NORMALIZER_VERSION if args.normalize else None):
+        sys.exit(
+            f"{out_path} was scored with normalizer_version={existing.get('normalizer_version')}; "
+            f"run `asr-nl-rescore {out_path} --in-place` first so merged results stay comparable."
+        )
+
     backend = create_backend(args)
     data_dir = Path(args.data_dir) if args.data_dir else None
-    
+
     try:
+        run_info = backend.run_info()
         results = {}
         for ds_name in args.datasets:
             key = DATASETS[ds_name]["key"]
@@ -134,36 +167,6 @@ def main():
             )
     finally:
         backend.close()
-    
-    from asr_nl.backends import AudioAPIBackend, VLLMServerBackend, TransformersBackend, NeMoBackend
-
-    def _backend_version(b) -> dict:
-        try:
-            if isinstance(b, VLLMServerBackend):
-                import vllm
-                mode = getattr(b._api, "api_mode", "transcriptions")
-                return {"api_mode": mode, "vllm_version": vllm.__version__}
-            if isinstance(b, TransformersBackend):
-                import transformers
-                return {"transformers_version": transformers.__version__}
-            if isinstance(b, NeMoBackend):
-                import nemo
-                return {"nemo_version": nemo.__version__}
-            if isinstance(b, AudioAPIBackend):
-                mode = getattr(b, "api_mode", "transcriptions")
-                if mode == "murmel":
-                    import murmel
-                    return {"api_mode": mode, "murmel_version": murmel.__version__}
-                if mode == "reson8":
-                    return {"api_mode": mode}
-                if mode == "elevenlabs":
-                    import elevenlabs
-                    return {"api_mode": mode, "elevenlabs_version": elevenlabs.__version__}
-                import vllm
-                return {"api_mode": mode, "vllm_version": vllm.__version__}
-        except Exception:
-            pass
-        return {}
 
     record = {
         "model_id": args.model,
@@ -173,27 +176,24 @@ def main():
         "params_billions": args.params_billions,
         "backend_used": args.backend,
         "normalize": args.normalize,
+        "normalizer_version": NORMALIZER_VERSION if args.normalize else None,
         "run_info": {
-            **_backend_version(backend),
+            **run_info,
             "package_version": asr_nl.__version__,
+            "git_commit": _git_commit(),
+            "container": os.environ.get("APPTAINER_CONTAINER"),
+            "container_lock_sha": os.environ.get("ASR_NL_LOCK_SHA"),
         },
         "results": results,
     }
-    
-    output_dir = Path(args.output_dir)
+
+    if existing:
+        record["results"] = {**existing.get("results", {}), **record["results"]}
+
     output_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = args.model.replace("/", "__")
-    out_path = output_dir / f"{safe_name}.json"
-    
-    if out_path.exists():
-        with open(out_path) as f:
-            existing = json.load(f)
-        existing.setdefault("results", {}).update(record["results"])
-        record["results"] = existing["results"]
-    
     with open(out_path, "w") as f:
         json.dump(record, f, indent=2, ensure_ascii=False)
-    
+
     logger.info(f"Result written to: {out_path}")
     logger.info("Commit this file to the leaderboard Space repo to publish results.")
 
