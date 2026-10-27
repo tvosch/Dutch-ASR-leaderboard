@@ -26,6 +26,7 @@ dependencies = [
     "openai==2.33.0",
     "pandas==2.2.3",
     "soundfile==0.13.1",
+    "text2num==3.1.0",
     "torch==2.10.0",
     "torchaudio==2.10.0",
     "torchcodec==0.10.0",
