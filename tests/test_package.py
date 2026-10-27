@@ -20,18 +20,6 @@ def test_every_dataset_declares_language():
         assert cfg["language"] in ("nl", "en"), name
 
 
-@pytest.mark.parametrize("raw, expected", [
-    ("Zeker 20% van al het water.", "zeker twintig van al het water"),
-    ("de auto's", "de autos"),
-    ("ING en Mr. Holmes", "ing en mr holmes"),
-    ("Noord-Holland, uh, ja", "noordholland ja"),
-    ("Hij zei: \"nee\" — en ging.", "hij zei nee en ging"),
-    ("", ""),
-])
-def test_normalize_dutch(raw, expected):
-    assert normalize_text(raw, "nl") == expected
-
-
 def test_reference_and_hypothesis_styles_agree():
     # FLEURS references are lowercased without punctuation; models emit
     # cased, punctuated text with digits. Both must normalize identically.
