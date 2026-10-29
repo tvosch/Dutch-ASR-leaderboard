@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = "==3.12.*"
 resolution-markers = [
     "platform_machine != 's390x'",
@@ -175,6 +175,7 @@ dependencies = [
     { name = "jiwer" },
     { name = "librosa" },
     { name = "murmel" },
+    { name = "murmel-flash" },
     { name = "nemo-toolkit" },
     { name = "num2words" },
     { name = "openai" },
@@ -210,6 +211,7 @@ requires-dist = [
     { name = "jiwer", specifier = "==4.0.0" },
     { name = "librosa", specifier = ">=0.11.0" },
     { name = "murmel", specifier = ">=0.1.0" },
+    { name = "murmel-flash", specifier = ">=5.0.0" },
     { name = "nemo-toolkit", specifier = "==2.7.3" },
     { name = "num2words", specifier = "==0.5.14" },
     { name = "openai", specifier = "==2.33.0" },
@@ -1546,6 +1548,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8a/d9/26a45d309d9dce708b7f6bbd81c7cebf86c0ac539219734672b92103f280/murmel-0.1.0.tar.gz", hash = "sha256:4d51d9b995c61910fef30d4227a830c9be82a44d6983c774e0875ed497ad0162", size = 6643, upload-time = "2026-03-21T11:25:25.669Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2d/72/1ecf6b95c3b451ee7cfb84ba51162c510cfec79bfa9d411c3118ab1a3cea/murmel-0.1.0-py3-none-any.whl", hash = "sha256:5a0d55ecb6aeb61a920fd3a8a9afabc25cf5d63d10c79fb3b44ed6fb35613de3", size = 8269, upload-time = "2026-03-21T11:25:23.736Z" },
+]
+
+[[package]]
+name = "murmel-flash"
+version = "5.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "numpy" },
+    { name = "pyyaml" },
+    { name = "safetensors" },
+    { name = "sentencepiece" },
+    { name = "soundfile" },
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2a/9e/71a1ff114ce038d39e7befdbd8c2e82da01e4057a4e7e9853af9913e4e4c/murmel_flash-5.0.0.tar.gz", hash = "sha256:29225cca7209863050800d25096de613d00ff3ece68a3afc8c87347774f26af4", size = 50831, upload-time = "2026-10-28T21:00:59.648Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/57/f3/c6abddd1e6ecc452a380fe4e4f28b7e86813abc313d729df06fa5460236e/murmel_flash-5.0.0-py3-none-any.whl", hash = "sha256:9f2886caa6e9acea9e3e694d556abc0a445e8293d88582dfe0157f55c2a4af3b", size = 43868, upload-time = "2026-10-28T21:00:58.415Z" },
 ]
 
 [[package]]

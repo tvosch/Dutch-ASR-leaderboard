@@ -21,6 +21,7 @@ dependencies = [
     "jiwer==4.0.0",
     "librosa>=0.11.0",
     "murmel>=0.1.0",
+    "murmel-flash>=5.0.0",
     "nemo-toolkit==2.7.3",
     "num2words==0.5.14",
     "openai==2.33.0",
