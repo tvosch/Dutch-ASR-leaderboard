@@ -4,6 +4,7 @@ import logging
 
 from .api import AudioAPIBackend, VLLMServerBackend
 from .base import BaseBackend
+from .murmel_flash import MurmelFlashBackend
 from .nemo import NeMoBackend
 from .transformers import TransformersBackend
 
@@ -33,5 +34,9 @@ def create_backend(args) -> BaseBackend:
     if backend == "nemo":
         logger.info("Using NeMo backend")
         return NeMoBackend(args.model, args.device)
+
+    if backend == "murmel-flash":
+        logger.info("Using murmel-flash backend")
+        return MurmelFlashBackend(args.model, args.device)
 
     raise ValueError(f"Unknown backend: {backend!r}")

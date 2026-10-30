@@ -36,13 +36,14 @@ def parse_args():
     g = p.add_argument_group("Backend")
     g.add_argument(
         "--backend",
-        choices=["vllm", "api", "transformers", "nemo"],
+        choices=["vllm", "api", "transformers", "nemo", "murmel-flash"],
         default="vllm",
         help=(
             "vllm: spawn a local vLLM server (default). "
             "api: use an OpenAI-compatible HTTP endpoint. "
             "transformers: HuggingFace pipeline. "
-            "nemo: NVIDIA NeMo ASR."
+            "nemo: NVIDIA NeMo ASR. "
+            "murmel-flash: murmel-flash models (requires murmel-flash package)."
         ),
     )
     g.add_argument(
